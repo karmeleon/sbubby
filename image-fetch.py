@@ -10,7 +10,7 @@ from urllib.parse import urlparse, urlunsplit
 from PIL import Image
 import requests
 
-COUNT = 0
+SKIP_FILE_NAME = 'skip.txt'
 
 def main():
 	parser = argparse.ArgumentParser(description='Hoover up some reddit posts in JSON format and download their images.')
@@ -27,25 +27,36 @@ def main():
 	
 	posts = [(post['id'], post['url']) for post in json_data]
 
+	# see which IDs we should skip
+	if os.path.isfile(SKIP_FILE_NAME):
+		with open(SKIP_FILE_NAME, 'r') as file:
+			dead_ids = {line.rstrip('\n') for line in file}
+	else:
+		dead_ids = set()
+
 	img_path = os.path.abspath('images')
 
 	if not os.path.isdir(img_path):
 		os.mkdir(img_path)
 
 	# get just the filename (without path or extension)
-	existing_images = {os.path.splitext(os.path.split(f)[1])[0] for f in os.listdir(img_path) if os.path.isfile(os.path.join(img_path, f))}
+	existing_images = {
+		os.path.splitext(os.path.split(f)[1])[0]
+		for f in os.listdir(img_path)
+		if os.path.isfile(os.path.join(img_path, f))
+	}
 
-	bound_download_image = functools.partial(download_image, existing_images, img_path)
+	bound_download_image = functools.partial(download_image, existing_images | dead_ids, img_path)
 
 	# fire up a thread pool to download + save the images in parallel
 	with ThreadPoolExecutor(max_workers=4) as pool:
 		pool.map(bound_download_image, posts)
 
 
-def download_image(existing_images, img_path, post_data):
+def download_image(skip_images, img_path, post_data):
 	post_id, url = post_data
-	# don't download anything we've already downloaded
-	if post_id in existing_images:
+	# don't download anything we've already downloaded or know to be dead
+	if post_id in skip_images:
 		return
 	
 	parsed_url = urlparse(url)
@@ -69,9 +80,11 @@ def download_image(existing_images, img_path, post_data):
 		# check to see if it's actually worth saving
 		if image.size == (130, 60):
 			print(f'{direct_image_url} is (probably) a deleted reddit image post :(')
+			skip_post(post_id)
 			return
 		if image.size == (161, 81):
 			print(f'{direct_image_url} is (probably) a deleted imgur post :(')
+			skip_post(post_id)
 			return
 
 		image.save(os.path.join(img_path, f'{post_id}.jpg'))
@@ -85,6 +98,14 @@ def imgur_imageify(url):
 	url[1] = 'i.imgur.com'
 	url[2] += '.png'
 	return urlunsplit(url)
+
+
+def skip_post(post_id):
+	# Keep a note to skip a post in future runs (only do this if the post has been deleted,
+	# not just because the fetch failed -- it could mean we need a new function to handle the url)
+	with open(SKIP_FILE_NAME, 'a') as file:
+		file.write(f'{post_id}\n')
+
 
 if __name__ == '__main__':
 	main()

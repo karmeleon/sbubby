@@ -105,3 +105,7 @@ venv.bak/
 
 # vs code
 /.vscode
+
+# custom
+/skip.txt
+/images
