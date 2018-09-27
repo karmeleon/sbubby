@@ -13,6 +13,7 @@ import requests
 SKIP_FILE_NAME = 'skip.txt'
 ERROR_FILE_NAME = 'error_ids.txt'
 ERROR_URL_FILE_NAME = 'error_urls.txt'
+URL_BLACKLIST_FILE_NAME = 'blacklisted_urls.txt'
 
 def main():
 	parser = argparse.ArgumentParser(description='Hoover up some reddit posts in JSON format and download their images.')
@@ -35,6 +36,11 @@ def main():
 		if os.path.isfile(filename):
 			with open(filename, 'r') as file:
 				dead_ids = dead_ids | {line.rstrip('\n') for line in file}
+	
+	with open(URL_BLACKLIST_FILE_NAME, 'r') as file:
+		url_blacklist = {line.rstrip('\n') for line in file}
+	
+	print(list(url_blacklist))
 
 	img_path = os.path.abspath('images')
 
@@ -48,20 +54,24 @@ def main():
 		if os.path.isfile(os.path.join(img_path, f))
 	}
 
-	bound_download_image = functools.partial(download_image, existing_images | dead_ids, img_path)
+	bound_download_image = functools.partial(download_image, existing_images | dead_ids, url_blacklist, img_path)
 
 	# fire up a thread pool to download + save the images in parallel
 	with ThreadPoolExecutor(max_workers=4) as pool:
 		pool.map(bound_download_image, posts)
 
 
-def download_image(skip_images, img_path, post_data):
+def download_image(skip_images, url_blacklist, img_path, post_data):
 	post_id, url = post_data
 	# don't download anything we've already downloaded or know to be dead
 	if post_id in skip_images:
 		return
 	
 	parsed_url = urlparse(url)
+
+	# skip any blacklisted domains
+	if parsed_url.netloc in url_blacklist:
+		return
 
 	# A map of netlocs to functions that can transform the link into a raw image URL
 	PARSERS = {
@@ -76,8 +86,8 @@ def download_image(skip_images, img_path, post_data):
 		direct_image_url = url
 
 	try:
-		r = requests.get(direct_image_url, timeout=10)
-		# dump it as a png
+		r = requests.get(direct_image_url, timeout=5)
+		# load the image
 		image = Image.open(BytesIO(r.content))
 		# check to see if it's actually worth saving
 		if image.size == (130, 60):
@@ -89,6 +99,7 @@ def download_image(skip_images, img_path, post_data):
 			skip_post(post_id)
 			return
 
+		# dump it as a jpg
 		image.save(os.path.join(img_path, f'{post_id}.jpg'))
 		print(f'downloaded {direct_image_url} for post id {post_id}')
 	except Exception as e:
