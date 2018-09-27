@@ -11,6 +11,8 @@ from PIL import Image
 import requests
 
 SKIP_FILE_NAME = 'skip.txt'
+ERROR_FILE_NAME = 'error_ids.txt'
+ERROR_URL_FILE_NAME = 'error_urls.txt'
 
 def main():
 	parser = argparse.ArgumentParser(description='Hoover up some reddit posts in JSON format and download their images.')
@@ -27,12 +29,12 @@ def main():
 	
 	posts = [(post['id'], post['url']) for post in json_data]
 
+	dead_ids = set()
 	# see which IDs we should skip
-	if os.path.isfile(SKIP_FILE_NAME):
-		with open(SKIP_FILE_NAME, 'r') as file:
-			dead_ids = {line.rstrip('\n') for line in file}
-	else:
-		dead_ids = set()
+	for filename in [SKIP_FILE_NAME, ERROR_FILE_NAME]:
+		if os.path.isfile(filename):
+			with open(filename, 'r') as file:
+				dead_ids = dead_ids | {line.rstrip('\n') for line in file}
 
 	img_path = os.path.abspath('images')
 
@@ -91,6 +93,7 @@ def download_image(skip_images, img_path, post_data):
 		print(f'downloaded {direct_image_url} for post id {post_id}')
 	except Exception as e:
 		print(f'failed to download {direct_image_url} ({type(e)})')
+		note_errored_post(post_id, url)
 
 
 def imgur_imageify(url):
@@ -105,6 +108,15 @@ def skip_post(post_id):
 	# not just because the fetch failed -- it could mean we need a new function to handle the url)
 	with open(SKIP_FILE_NAME, 'a') as file:
 		file.write(f'{post_id}\n')
+
+
+def note_errored_post(post_id, url):
+	# Keep a note that a post has a URL that errored out while downloading to skip it next time,
+	# and also save the URL for future analysis
+	with open(ERROR_FILE_NAME, 'a') as file:
+		file.write(f'{post_id}\n')
+	with open(ERROR_URL_FILE_NAME, 'a') as file:
+		file.write(f'{url}\n')
 
 
 if __name__ == '__main__':
