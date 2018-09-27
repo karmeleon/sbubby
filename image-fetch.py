@@ -74,7 +74,7 @@ def download_image(skip_images, img_path, post_data):
 		direct_image_url = url
 
 	try:
-		r = requests.get(direct_image_url)
+		r = requests.get(direct_image_url, timeout=10)
 		# dump it as a png
 		image = Image.open(BytesIO(r.content))
 		# check to see if it's actually worth saving
