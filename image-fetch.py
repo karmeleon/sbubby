@@ -39,8 +39,6 @@ def main():
 	
 	with open(URL_BLACKLIST_FILE_NAME, 'r') as file:
 		url_blacklist = {line.rstrip('\n') for line in file}
-	
-	print(list(url_blacklist))
 
 	img_path = os.path.abspath('images')
 
