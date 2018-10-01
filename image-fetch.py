@@ -10,6 +10,8 @@ from urllib.parse import urlparse, urlunsplit
 from PIL import Image
 import requests
 
+import common
+
 SKIP_FILE_NAME = 'skip.txt'
 URL_WHITELIST_FILE_NAME = 'url_whitelist.txt'
 
@@ -37,11 +39,7 @@ def main():
 		os.mkdir(img_path)
 
 	# get just the filename (without path or extension)
-	existing_images = {
-		os.path.splitext(os.path.split(f)[1])[0]
-		for f in os.listdir(img_path)
-		if os.path.isfile(os.path.join(img_path, f))
-	}
+	existing_images = common.get_filenames_in_directory_without_extension(img_path)
 
 	bound_download_image = functools.partial(download_image, existing_images, url_whitelist, img_path)
 

@@ -109,3 +109,5 @@ venv.bak/
 # custom
 /skip.txt
 /images
+/records
+/output
