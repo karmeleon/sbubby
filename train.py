@@ -87,7 +87,7 @@ def input_fn(is_training, records_dir):
 		dataset = dataset.take(int(SPLIT_PERCENTAGE * len(files)))
 	else:
 		dataset = dataset.skip(int(SPLIT_PERCENTAGE * len(files)))
-		dataset = dataset.apply(tf.contrib.data.shuffle_and_repeat(1000, 10))
+		dataset = dataset.apply(tf.contrib.data.shuffle_and_repeat(1000, 150))
 
 	# process it into tensors
 	dataset = dataset.map(parse_example, num_parallel_calls=os.cpu_count() * 4)
