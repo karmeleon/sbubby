@@ -111,3 +111,8 @@ venv.bak/
 /images
 /records
 /output
+*.jpg
+checkpoint
+mapping.txt
+minified.json
+sbubby.h5
