@@ -3,8 +3,9 @@ import functools
 import json
 from multiprocessing import Pool
 import os.path
+import random
 
-from PIL import Image, ImageOps
+from PIL import Image
 from tqdm import tqdm
 import tensorflow as tf
 
@@ -18,6 +19,8 @@ def _bytes_feature(value):
 
 def _float_feature(value):
     return tf.train.Feature(float_list=tf.train.FloatList(value=[value]))
+
+IMAGE_SIZE = 256
 
 def main():
 	parser = argparse.ArgumentParser(description='Convert JSON and .jpeg data into a .tfrecords file for use in train.py.')
@@ -37,18 +40,27 @@ def main():
 	with open(args.file, 'r', encoding='utf-8') as f:
 		json_data = json.load(f)
 	
+	# mix it up to improve training data
+	random.shuffle(json_data)
+
 	# see which images we should be skipping
 	print('Discovering image files')
 	post_ids_with_images = common.get_filenames_in_directory_without_extension('images')
 
-	print('Processing data')
 	with Pool(processes=os.cpu_count()) as pool:
-		map_partial = functools.partial(process_post, post_ids_with_images, output_dir)
+		print('Enumerating subreddits')
+		subs = list(set(pool.imap_unordered(extract_sub, json_data, 300)))
+
+		sub_to_number = {sub: idx for (idx, sub) in enumerate(subs)}
+
+		print('Processing data')
+		map_partial = functools.partial(process_post, post_ids_with_images, sub_to_number, output_dir)
 		samples = pool.imap_unordered(map_partial, json_data, 30)
 		
 		shard_num = 0
 		samples_per_shard = 500
 		sample_count = 0
+		total_samples = 0
 
 		writer = tf.python_io.TFRecordWriter(os.path.join(output_dir, f'{shard_num}.tfrecords'))
 
@@ -57,6 +69,7 @@ def main():
 				continue
 			writer.write(sample)
 			sample_count += 1
+			total_samples += 1
 			if sample_count == samples_per_shard:
 				writer.close()
 				sample_count = 0
@@ -65,23 +78,41 @@ def main():
 		
 		writer.close()
 
+		print(f'Wrote {total_samples} samples with the following number/sub mapping:')
+		
+		with open('mapping.txt', 'w') as f:
+			for num, sub in sub_to_number.items():
+				mapping = f'{num}: {sub}'
+				print(mapping)
+				f.write(f'{mapping}\n')
+
 	
 	print(f'Output to {output_dir}')
-	
-def process_post(post_ids_with_images, output_dir, post):
+
+def extract_sub(post):
+	return post['subreddit']
+
+def process_post(post_ids_with_images, sub_to_number, output_dir, post):
 	if post['id'] not in post_ids_with_images:
 		return
 	try:
 		im = Image.open(os.path.abspath(os.path.join('images', f'{post["id"]}.jpg')))
 		im = im.convert('RGB')
-		im = ImageOps.fit(im, (384, 384))
+		# Resize the image down, then paste it on a square canvas to pad it to 1:1
+		im.thumbnail((IMAGE_SIZE, IMAGE_SIZE))
+		canvas = Image.new('RGB', (IMAGE_SIZE, IMAGE_SIZE))
+		upper_left = (
+			int((IMAGE_SIZE - im.size[0]) / 2),
+			int((IMAGE_SIZE - im.size[1]) / 2),
+		)
+		canvas.paste(im, upper_left)
 	except OSError:
 		print(f'Failed to process {post["id"]}, dropping')
 		return None
 
 	feature = {
-		'score': _int64_feature(post['score']),
-		'image': _bytes_feature(im.tobytes()),
+		'subreddit': _int64_feature(sub_to_number[post['subreddit']]),
+		'image': _bytes_feature(canvas.tobytes()),
 	}
 
 	example = tf.train.Example(features=tf.train.Features(feature=feature))

@@ -1,14 +1,16 @@
 import argparse
-from concurrent.futures import ThreadPoolExecutor
+import collections
 import functools
 from io import BytesIO
 import json
+from multiprocessing import Pool
 import os
 import os.path
-from urllib.parse import urlparse, urlunsplit
+from urllib.parse import urlparse, urlunparse
 
 from PIL import Image
 import requests
+from tqdm import tqdm
 
 import common
 
@@ -28,7 +30,7 @@ def main():
 	with open(args.file, 'r', encoding="utf-8") as f:
 		json_data = json.load(f)
 	
-	posts = [(post['id'], post['url']) for post in json_data]
+	posts = [(post['id'], post['url'], post['subreddit']) for post in json_data]
 	
 	with open(URL_WHITELIST_FILE_NAME, 'r') as file:
 		url_whitelist = {line.rstrip('\n') for line in file}
@@ -43,22 +45,33 @@ def main():
 
 	bound_download_image = functools.partial(download_image, existing_images, url_whitelist, img_path)
 
+	# default dict for counting posts downloaded from each sub, defaults to 0
+	counts = collections.defaultdict(int)
+
 	# fire up a thread pool to download + save the images in parallel
-	with ThreadPoolExecutor(max_workers=4) as pool:
-		pool.map(bound_download_image, posts)
+	with Pool(processes=os.cpu_count()) as pool:
+		results = pool.imap_unordered(bound_download_image, posts, 10)
+		for result in tqdm(results, total=len(posts)):
+			if result is None:
+				continue
+			counts[result] += 1
+	
+	print('Downloaded:')
+	for sub, count in counts.items():
+		print(f'{sub}: {count}')
 
 
 def download_image(skip_images, url_whitelist, img_path, post_data):
-	post_id, url = post_data
+	post_id, url, subreddit = post_data
 	# don't download anything we've already downloaded or know to be dead
 	if post_id in skip_images:
-		return
+		return None
 	
 	parsed_url = urlparse(url)
 
 	# skip any blacklisted domains
 	if parsed_url.netloc not in url_whitelist:
-		return
+		return None
 
 	# A map of netlocs to functions that can transform the link into a raw image URL
 	PARSERS = {
@@ -78,26 +91,26 @@ def download_image(skip_images, url_whitelist, img_path, post_data):
 		image = Image.open(BytesIO(r.content))
 		# check to see if it's actually worth saving
 		if image.size == (130, 60):
-			print(f'{direct_image_url} is (probably) a deleted reddit image post :(')
 			skip_post(post_id)
-			return
+			return None
 		if image.size == (161, 81):
-			print(f'{direct_image_url} is (probably) a deleted imgur post :(')
 			skip_post(post_id)
-			return
+			return None
 
 		# dump it as a jpg
 		image.save(os.path.join(img_path, f'{post_id}.jpg'))
-		print(f'downloaded {direct_image_url} for post id {post_id}')
-	except Exception as e:
-		print(f'failed to download {direct_image_url} ({type(e)})')
+	except Exception:
+		# stuff breaks sometimes, we don't really care
+		return None
+	
+	# return which sub we got it from to keep track of how many images of each sub we actually download
+	return subreddit
 
 
 def imgur_imageify(url):
 	# change 'imgur.com' to 'i.imgur.com' and add '.png' to the url
-	url[1] = 'i.imgur.com'
-	url[2] += '.png'
-	return urlunsplit(url)
+	url._replace(netloc='i.imgur.com', path=f'{url.path}.png')
+	return urlunparse(url)
 
 
 def skip_post(post_id):
