@@ -78,13 +78,14 @@ def main():
 		
 		writer.close()
 
-		print(f'Wrote {total_samples} samples with the following number/sub mapping:')
-		
-		with open('mapping.txt', 'w') as f:
-			for num, sub in sub_to_number.items():
-				mapping = f'{num}: {sub}'
-				print(mapping)
-				f.write(f'{mapping}\n')
+	metadata = {
+		'mapping': subs,
+		'totalSamples': total_samples,
+	}
+
+	# dump some metadata for the trainer and predictor
+	with open('sbubby_metadata.json', 'w') as outfile:
+		json.dump(metadata, outfile)
 
 	
 	print(f'Output to {output_dir}')

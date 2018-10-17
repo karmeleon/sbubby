@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 import os.path
 
@@ -15,6 +16,16 @@ def main():
 
 	args = parser.parse_args()
 
+	metadata_file = os.path.abspath('sbubby_metadata.json')
+
+	# TODO: dedupe this
+	if not os.path.isfile(metadata_file):
+		print("Couldn't find the metadata JSON -- did you run preprocess yet?")
+		exit(1)
+	
+	with open(metadata_file, 'r') as metadata_file:
+		metadata = json.load(metadata_file)
+
 	im = Image.open(args.image_path)
 	# TODO: dedupe this
 	im = im.convert('RGB')
@@ -28,13 +39,17 @@ def main():
 	canvas.paste(im, upper_left)
 
 	im_array = np.expand_dims(np.asarray(canvas), axis=0)
+	# convert it to a float array
+	im_array = im_array.astype(np.float16)
+	# then divide by 255 to have pixel values between 0 and 1
+	im_array /= 255
 
 	model = keras.models.load_model('sbubby.h5')
 
-	tmp = model.outputs
-	model.outputs = [model.layers[-1].output]
+	output_vector = model.predict(im_array)
 
-	print(model.predict(im_array))
+	for sub, weight in zip(metadata['mapping'], output_vector[0]):
+		print(f'{sub.ljust(15)}: {weight:.3f}')
 
 if __name__ == '__main__':
 	main()

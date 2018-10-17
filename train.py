@@ -11,17 +11,12 @@ import common
 SPLIT_PERCENTAGE = 0.8
 IMAGE_SIZE = 256
 BATCH_SIZE = 96
-NUM_EPOCHS = 5
+NUM_EPOCHS = 10
 
 def main():
-	parser = argparse.ArgumentParser(description='Train a model to classify images based on their subreddit')
-	parser.add_argument('example_count', type=int, help='The count of individual examples in the ./records/ directory')
-	parser.add_argument('sub_count', type=int, help='The number of subreddits to classify')
-
-	args = parser.parse_args()
-
 	output_dir = os.path.abspath('output')
 	records_dir = os.path.abspath('records')
+	metadata_file = os.path.abspath('sbubby_metadata.json')
 
 	if not os.path.isdir(output_dir):
 		os.mkdir(output_dir)
@@ -29,8 +24,18 @@ def main():
 	if not os.path.isdir(records_dir):
 		print("Couldn't find the records directory -- did you run preprocess yet?")
 		exit(1)
+	
+	if not os.path.isfile(metadata_file):
+		print("Couldn't find the metadata JSON -- did you run preprocess yet?")
+		exit(1)
+	
+	with open(metadata_file, 'r') as metadata_file:
+		metadata = json.load(metadata_file)
+	
+	total_samples = metadata['totalSamples']
+	sub_count = len(metadata['mapping'])
 
-	training_dataset, training_size = get_dataset(True, records_dir, args.example_count, args.sub_count)
+	training_dataset, training_size = get_dataset(True, records_dir, total_samples, sub_count)
 
 	model = keras.Sequential()
 
@@ -84,7 +89,7 @@ def main():
 	# overfitting is bad okay
 	model.add(keras.layers.Dropout(0.4))
 	# output layer
-	model.add(keras.layers.Dense(args.sub_count, 'softmax'))
+	model.add(keras.layers.Dense(sub_count, 'softmax'))
 
 	# compile it
 	model.compile(
@@ -110,7 +115,7 @@ def main():
 	model.save('sbubby.h5')
 
 	print('Evaluating')
-	eval_dataset, eval_size = get_dataset(False, records_dir, args.example_count, args.sub_count)
+	eval_dataset, eval_size = get_dataset(False, records_dir, sample_count, sub_count)
 	print(model.evaluate(eval_dataset, steps=int(eval_size / BATCH_SIZE)))
 
 def parse_example(example_proto, sub_count):
