@@ -98,22 +98,14 @@ def process_post(post_ids_with_images, sub_to_number, output_dir, post):
 		return
 	try:
 		im = Image.open(os.path.abspath(os.path.join('images', f'{post["id"]}.jpg')))
-		im = im.convert('RGB')
-		# Resize the image down, then paste it on a square canvas to pad it to 1:1
-		im.thumbnail((IMAGE_SIZE, IMAGE_SIZE))
-		canvas = Image.new('RGB', (IMAGE_SIZE, IMAGE_SIZE))
-		upper_left = (
-			int((IMAGE_SIZE - im.size[0]) / 2),
-			int((IMAGE_SIZE - im.size[1]) / 2),
-		)
-		canvas.paste(im, upper_left)
+		im = common.process_image(im, IMAGE_SIZE)
 	except OSError:
 		print(f'Failed to process {post["id"]}, dropping')
 		return None
 
 	feature = {
 		'subreddit': _int64_feature(sub_to_number[post['subreddit']]),
-		'image': _bytes_feature(canvas.tobytes()),
+		'image': _bytes_feature(im.tobytes()),
 	}
 
 	example = tf.train.Example(features=tf.train.Features(feature=feature))

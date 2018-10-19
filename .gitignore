@@ -111,6 +111,7 @@ venv.bak/
 /images
 /records
 /output
+/test
 *.jpg
 checkpoint
 mapping.txt

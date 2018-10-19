@@ -42,7 +42,7 @@ def main():
 	# First conv layer
 	model.add(keras.layers.Conv2D(
 		filters=32,
-		kernel_size=(5, 5),
+		kernel_size=(3, 3),
 		padding='same',
 		activation='relu',
 		data_format='channels_last',
@@ -61,7 +61,7 @@ def main():
 	# Second conv layer
 	model.add(keras.layers.Conv2D(
 		filters=32,
-		kernel_size=(5, 5),
+		kernel_size=(3, 3),
 		padding='same',
 		activation='relu',
 		data_format='channels_last',
@@ -83,11 +83,11 @@ def main():
 	# we're looking at a 64 * 64 vector, do that many layers
 	model.add(keras.layers.Dense(1024, 'relu'))
 	# d-d-d-dropout
-	#model.add(keras.layers.Dropout(0.5))
+	model.add(keras.layers.Dropout(0.5))
 	# then cut it down
 	model.add(keras.layers.Dense(256, 'relu'))
 	# overfitting is bad okay
-	model.add(keras.layers.Dropout(0.4))
+	model.add(keras.layers.Dropout(0.5))
 	# output layer
 	model.add(keras.layers.Dense(sub_count, 'softmax'))
 
@@ -115,7 +115,7 @@ def main():
 	model.save('sbubby.h5')
 
 	print('Evaluating')
-	eval_dataset, eval_size = get_dataset(False, records_dir, sample_count, sub_count)
+	eval_dataset, eval_size = get_dataset(False, records_dir, total_samples, sub_count)
 	print(model.evaluate(eval_dataset, steps=int(eval_size / BATCH_SIZE)))
 
 def parse_example(example_proto, sub_count):
