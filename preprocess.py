@@ -62,7 +62,7 @@ def main():
 		sample_count = 0
 		total_samples = 0
 
-		writer = tf.python_io.TFRecordWriter(os.path.join(output_dir, f'{shard_num}.tfrecords'))
+		writer = tf.python_io.TFRecordWriter(os.path.join(output_dir, '{}.tfrecords'.format(shard_num)))
 
 		for sample in tqdm(samples, total=len(json_data)):
 			if sample is None:
@@ -74,7 +74,7 @@ def main():
 				writer.close()
 				sample_count = 0
 				shard_num += 1
-				writer = tf.python_io.TFRecordWriter(os.path.join(output_dir, f'{shard_num}.tfrecords'))
+				writer = tf.python_io.TFRecordWriter(os.path.join(output_dir, '{}.tfrecords'.format(shard_num)))
 		
 		writer.close()
 
@@ -88,7 +88,7 @@ def main():
 		json.dump(metadata, outfile)
 
 	
-	print(f'Output to {output_dir}')
+	print('Output to {}'.format(output_dir))
 
 def extract_sub(post):
 	return post['subreddit']
@@ -97,10 +97,10 @@ def process_post(post_ids_with_images, sub_to_number, output_dir, post):
 	if post['id'] not in post_ids_with_images:
 		return
 	try:
-		im = Image.open(os.path.abspath(os.path.join('images', f'{post["id"]}.jpg')))
+		im = Image.open(os.path.abspath(os.path.join('images', '{}.jpg').format(post["id"])))
 		im = common.process_image(im, IMAGE_SIZE)
 	except OSError:
-		print(f'Failed to process {post["id"]}, dropping')
+		print('Failed to process {}, dropping'.format(post["id"]))
 		return None
 
 	feature = {

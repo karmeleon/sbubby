@@ -71,7 +71,7 @@ def predict_with_keras(im_array, metadata):
 
 def print_output_tensor(output_tensor, metadata):
 	for sub, weight in zip(metadata['mapping'], output_tensor[0]):
-		print(f'{sub.ljust(15)}: {weight:.3f}')
+		print('{}: {:.3f}'.format(sub.ljust(15), weight))
 	
 def convert_model_to_tflite():
 	print('Converting h5 model to tflite...')

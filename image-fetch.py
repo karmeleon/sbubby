@@ -24,7 +24,7 @@ def main():
 	args = parser.parse_args()
 
 	if not os.path.isfile(args.file):
-		print(f'{args.file} does not exist, exiting.')
+		print('{} does not exist, exiting.'.format(args.file))
 		exit(1)
 	
 	with open(args.file, 'r', encoding="utf-8") as f:
@@ -58,7 +58,7 @@ def main():
 	
 	print('Downloaded:')
 	for sub, count in counts.items():
-		print(f'{sub}: {count}')
+		print('{}: {}'.format(sub, count))
 
 
 def download_image(skip_images, url_whitelist, img_path, post_data):
@@ -98,7 +98,7 @@ def download_image(skip_images, url_whitelist, img_path, post_data):
 			return None
 
 		# dump it as a jpg
-		image.save(os.path.join(img_path, f'{post_id}.jpg'))
+		image.save(os.path.join(img_path, '{}.jpg'.format(post_id)))
 	except Exception:
 		# stuff breaks sometimes, we don't really care
 		return None
@@ -109,7 +109,7 @@ def download_image(skip_images, url_whitelist, img_path, post_data):
 
 def imgur_imageify(url):
 	# change 'imgur.com' to 'i.imgur.com' and add '.png' to the url
-	url._replace(netloc='i.imgur.com', path=f'{url.path}.png')
+	url._replace(netloc='i.imgur.com', path='{}.png'.format(url.path))
 	return urlunparse(url)
 
 
@@ -117,7 +117,7 @@ def skip_post(post_id):
 	# Keep a note to skip a post in future runs (only do this if the post has been deleted,
 	# not just because the fetch failed -- it could mean we need a new function to handle the url)
 	with open(SKIP_FILE_NAME, 'a') as file:
-		file.write(f'{post_id}\n')
+		file.write('{}\n'.format(post_id))
 
 
 if __name__ == '__main__':
