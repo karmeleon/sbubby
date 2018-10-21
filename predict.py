@@ -13,70 +13,55 @@ import common
 def main():
 	parser = argparse.ArgumentParser(description='Pass in an image, get a sub.')
 	parser.add_argument('image_path', help='A path to an image to test')
-	parser.add_argument('-l', action='store_true', help='Use TensorFlow Lite to predict, convering the h5 as necessary')
 
 	args = parser.parse_args()
 
 	# the GPU is overkill
 	os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
-	metadata_file = os.path.abspath('sbubby_metadata.json')
-
-	# TODO: dedupe this
-	if not os.path.isfile(metadata_file):
-		print("Couldn't find the metadata JSON -- did you run preprocess yet?")
-		exit(1)
-	
-	with open(metadata_file, 'r') as metadata_file:
-		metadata = json.load(metadata_file)
-
 	im = Image.open(args.image_path)
-	im = common.process_image(im)
 
-	im_array = np.expand_dims(np.asarray(im), axis=0)
-	# convert it to a float array
-	im_array = im_array.astype(np.float16)
-	# then divide by 255 to have pixel values between 0 and 1
-	im_array /= 255
+	predictor = Predictor()
+	predictor.print_result_tensor(predictor.predict(im))
 
-	if args.l:
-		predict_with_tflite(im_array, metadata)
-	else:
-		predict_with_keras(im_array, metadata)
+class Predictor(object):
+	def __init__(self):
+		metadata_file = os.path.abspath('sbubby_metadata.json')
 
-def predict_with_tflite(im_array, metadata):
-	if not os.path.isfile('sbubby.tflite'):
-		convert_model_to_tflite()
+		# TODO: dedupe this
+		if not os.path.isfile(metadata_file):
+			print("Couldn't find the metadata JSON -- did you run preprocess yet?")
+			exit(1)
+		
+		with open(metadata_file, 'r') as metadata_file:
+			self.metadata = json.load(metadata_file)
+		
+		self.model = keras.models.load_model('sbubby.h5')
+
+		print('Loaded Keras predictor.')
 	
-	print('Predicting with tflite')
+	def predict(self, image):
+		"""
+		:param image: a PIL image. This method will transform it into a model-friendly format.
+		:returns: a zip of (sub_name, probability)
+		"""
+		im = common.process_image(image)
+
+		im_array = np.expand_dims(np.asarray(im), axis=0)
+		# convert it to a float array
+		im_array = im_array.astype(np.float16)
+		# then divide by 255 to have pixel values between 0 and 1
+		im_array /= 255
+		
+		# actually predict
+		output_tensor = self.model.predict(im_array)
+
+		zipped = zip(self.metadata['mapping'], output_tensor[0])
+		return sorted(zipped, key=lambda entry: entry[1], reverse=True)
 	
-	interpreter = tf.contrib.lite.Interpreter(model_path='sbubby.tflite')
-	input_details = interpreter.get_input_details()
-	output_details = interpreter.get_output_details()
-
-	interpreter.set_tensor(input_details[0]['index'], im_array[0])
-	interpreter.invoke()
-
-	output_tensor = interpreter.get_tensor(output_details[0]['index'])
-	print_output_tensor(output_tensor, metadata)
-
-def predict_with_keras(im_array, metadata):
-	print('Predicting with keras')
-	model = keras.models.load_model('sbubby.h5')
-
-	output_tensor = model.predict(im_array)
-	print_output_tensor(output_tensor, metadata)
-
-def print_output_tensor(output_tensor, metadata):
-	for sub, weight in zip(metadata['mapping'], output_tensor[0]):
-		print('{}: {:.3f}'.format(sub.ljust(15), weight))
-	
-def convert_model_to_tflite():
-	print('Converting h5 model to tflite...')
-	converter = tf.contrib.lite.TocoConverter.from_keras_model_file('sbubby.h5')
-	tflite_model = converter.convert()
-	with open('sbubby.tflite', 'wb') as f:
-		f.write(tflite_model)
+	def print_result_tensor(self, labeled_tensor):
+		for sub, weight in labeled_tensor:
+			print('{}: {:.3f}'.format(sub.ljust(15), weight))
 
 if __name__ == '__main__':
 	main()
