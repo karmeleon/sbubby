@@ -8,9 +8,7 @@ from PIL import Image
 import tensorflow as tf
 from tensorflow import keras
 
-from common import process_image
-
-IMAGE_SIZE = 256
+import common
 
 def main():
 	parser = argparse.ArgumentParser(description='Pass in an image, get a sub.')
@@ -33,7 +31,7 @@ def main():
 		metadata = json.load(metadata_file)
 
 	im = Image.open(args.image_path)
-	im = process_image(im, IMAGE_SIZE)
+	im = common.process_image(im)
 
 	im_array = np.expand_dims(np.asarray(im), axis=0)
 	# convert it to a float array
@@ -56,7 +54,7 @@ def predict_with_tflite(im_array, metadata):
 	input_details = interpreter.get_input_details()
 	output_details = interpreter.get_output_details()
 
-	interpreter.set_tensor(input_details[0]['index'], im_array)
+	interpreter.set_tensor(input_details[0]['index'], im_array[0])
 	interpreter.invoke()
 
 	output_tensor = interpreter.get_tensor(output_details[0]['index'])

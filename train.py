@@ -9,9 +9,8 @@ from tensorflow import keras
 import common
 
 SPLIT_PERCENTAGE = 0.8
-IMAGE_SIZE = 256
-BATCH_SIZE = 96
-NUM_EPOCHS = 10
+BATCH_SIZE = 32
+NUM_EPOCHS = 15
 
 def main():
 	output_dir = os.path.abspath('output')
@@ -47,11 +46,11 @@ def main():
 		activation='relu',
 		data_format='channels_last',
 		use_bias=True,
-		input_shape=(IMAGE_SIZE, IMAGE_SIZE, 3),
+		input_shape=(common.IMAGE_SIZE, common.IMAGE_SIZE, 3),
 	))
 
 	# First pool layer
-	model.add(keras.layers.MaxPooling2D(
+	model.add(keras.layers.AveragePooling2D(
 		pool_size=(2, 2),
 		strides=2,
 		padding='same',
@@ -68,8 +67,26 @@ def main():
 		use_bias=True,
 	))
 
-	# Second pool layer
-	model.add(keras.layers.MaxPooling2D(
+	# Second pool
+	model.add(keras.layers.AveragePooling2D(
+		pool_size=(2, 2),
+		strides=2,
+		padding='same',
+		data_format='channels_last',
+	))
+
+	# Third conv layer
+	model.add(keras.layers.Conv2D(
+		filters=32,
+		kernel_size=(3, 3),
+		padding='same',
+		activation='relu',
+		data_format='channels_last',
+		use_bias=True,
+	))
+
+	# Third pool
+	model.add(keras.layers.AveragePooling2D(
 		pool_size=(2, 2),
 		strides=2,
 		padding='same',
@@ -80,12 +97,7 @@ def main():
 	model.add(keras.layers.Flatten())
 
 	# fkin d e n s e
-	# we're looking at a 64 * 64 vector, do that many layers
-	model.add(keras.layers.Dense(1024, 'relu'))
-	# d-d-d-dropout
-	model.add(keras.layers.Dropout(0.5))
-	# then cut it down
-	model.add(keras.layers.Dense(256, 'relu'))
+	model.add(keras.layers.Dense(128, 'relu'))
 	# overfitting is bad okay
 	model.add(keras.layers.Dropout(0.5))
 	# output layer
@@ -108,6 +120,7 @@ def main():
 		callbacks=[
 			keras.callbacks.TensorBoard(log_dir='./output', write_images=True),
 			keras.callbacks.ModelCheckpoint(filepath='./checkpoint'),
+			keras.callbacks.EarlyStopping(monitor='acc', min_delta=0.01),
 		],
 	)
 

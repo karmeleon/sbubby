@@ -49,7 +49,7 @@ def main():
 	counts = collections.defaultdict(int)
 
 	# fire up a thread pool to download + save the images in parallel
-	with Pool(processes=os.cpu_count()) as pool:
+	with Pool(processes=os.cpu_count() * 2) as pool:
 		results = pool.imap_unordered(bound_download_image, posts, 10)
 		for result in tqdm(results, total=len(posts)):
 			if result is None:
@@ -96,6 +96,9 @@ def download_image(skip_images, url_whitelist, img_path, post_data):
 		if image.size == (161, 81):
 			skip_post(post_id)
 			return None
+		
+		# process the image down to being smol
+		image = common.process_image(image)
 
 		# dump it as a jpg
 		image.save(os.path.join(img_path, '{}.jpg'.format(post_id)))

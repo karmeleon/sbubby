@@ -20,8 +20,6 @@ def _bytes_feature(value):
 def _float_feature(value):
     return tf.train.Feature(float_list=tf.train.FloatList(value=[value]))
 
-IMAGE_SIZE = 256
-
 def main():
 	parser = argparse.ArgumentParser(description='Convert JSON and .jpeg data into a .tfrecords file for use in train.py.')
 	parser.add_argument('file', help='.json file to read from, in https://github.com/karmeleon/reddit-scraper format.')
@@ -98,7 +96,6 @@ def process_post(post_ids_with_images, sub_to_number, output_dir, post):
 		return
 	try:
 		im = Image.open(os.path.abspath(os.path.join('images', '{}.jpg').format(post["id"])))
-		im = common.process_image(im, IMAGE_SIZE)
 	except OSError:
 		print('Failed to process {}, dropping'.format(post["id"]))
 		return None
@@ -109,6 +106,8 @@ def process_post(post_ids_with_images, sub_to_number, output_dir, post):
 	}
 
 	example = tf.train.Example(features=tf.train.Features(feature=feature))
+
+	im.close()
 
 	return example.SerializeToString()
 
