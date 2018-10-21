@@ -72,49 +72,19 @@ def download_image(skip_images, url_whitelist, img_path, post_data):
 	# skip any blacklisted domains
 	if parsed_url.netloc not in url_whitelist:
 		return None
-
-	# A map of netlocs to functions that can transform the link into a raw image URL
-	PARSERS = {
-		'imgur.com': imgur_imageify,
-	}
-
-	if parsed_url.netloc in PARSERS:
-		# If we have a specialized handler for a URL, use it to transform the URL
-		direct_image_url = PARSERS[parsed_url.netloc](parsed_url)
-	else:
-		# Otherwise, cross our fingers and hope the URL is a direct image link
-		direct_image_url = url
-
-	try:
-		r = requests.get(direct_image_url, timeout=5)
-		# load the image
-		image = Image.open(BytesIO(r.content))
-		# check to see if it's actually worth saving
-		if image.size == (130, 60):
-			skip_post(post_id)
-			return None
-		if image.size == (161, 81):
-			skip_post(post_id)
-			return None
-		
-		# process the image down to being smol
-		image = common.process_image(image)
-
-		# dump it as a jpg
-		image.save(os.path.join(img_path, '{}.jpg'.format(post_id)))
-	except Exception:
-		# stuff breaks sometimes, we don't really care
-		return None
 	
-	# return which sub we got it from to keep track of how many images of each sub we actually download
+	image = common.fetch_image(url)
+
+	if image is None:
+		skip_post(post_id)
+
+	# process the image down to being smol
+	image = common.process_image(image)
+
+	# dump it as a jpg
+	image.save(os.path.join(img_path, '{}.jpg'.format(post_id)))
+
 	return subreddit
-
-
-def imgur_imageify(url):
-	# change 'imgur.com' to 'i.imgur.com' and add '.png' to the url
-	url._replace(netloc='i.imgur.com', path='{}.png'.format(url.path))
-	return urlunparse(url)
-
 
 def skip_post(post_id):
 	# Keep a note to skip a post in future runs (only do this if the post has been deleted,

@@ -1,5 +1,6 @@
 numpy
 Pillow==5.2.0
+praw==6.0.0
 requests==2.19.1
 tensorflow-gpu==1.11.0
 tqdm==4.26.0
