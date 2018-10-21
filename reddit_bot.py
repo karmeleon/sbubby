@@ -10,7 +10,7 @@ from predict import Predictor
 def main():
 	reddit = login_to_reddit()
 
-	me = reddit.user
+	me = reddit.user.me()
 
 	predictor = Predictor()
 
@@ -20,15 +20,17 @@ def main():
 		if '/u/sbubbot' in comment.body:
 			# check to see if we've already replied to this comment
 			already_replied = False
+			# get the replies data
+			comment.refresh()
 			for reply in comment.replies:
-				if reply.author.name == me.name:
+				if reply.author.id == me.id:
 					already_replied = True
 			if already_replied:
 				print("found a comment we've already replied to")
 				continue
 			
 			# pull the image
-			print('pulling image')
+			print('pulling image for comment {}'.format(comment.id))
 			image = get_image_for_comment(comment)
 
 			if image is None:
@@ -38,7 +40,7 @@ def main():
 				print('predicting')
 				start = time.time()
 				results = predictor.predict(image)
-				print('predicting took {} seconds, posting success comment'.format(time.time() - start))
+				print('predicting took {:.3f} seconds, posting success comment'.format(time.time() - start))
 				post_success_comment(reddit, comment, results)
 
 def post_failure_comment(reddit, comment):
@@ -58,7 +60,7 @@ def format_table_from_results(results):
 		# don't print out things that have < 1% similarity
 		if result[1] < 0.01:
 			continue
-		table += '{} | {:.3f}\n'.format(*result)
+		table += '/r/{} | {:.3f}\n'.format(*result)
 	return table
 
 def get_footer():
